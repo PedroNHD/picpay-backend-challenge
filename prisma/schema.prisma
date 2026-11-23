@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserType {
+  COMMON
+  MERCHANT
+}
+
+enum TransactionStatus {
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  fullName     String   @map("full_name")
+  document     String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  type         UserType
+  balanceCents Int      @default(0) @map("balance_cents")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  sentTransactions     Transaction[] @relation("PayerTransactions")
+  receivedTransactions Transaction[] @relation("PayeeTransactions")
+
+  @@map("users")
+}
+
+model Transaction {
+  id             String            @id @default(uuid())
+  idempotencyKey String?           @unique @map("idempotency_key")
+  payerId        String            @map("payer_id")
+  payeeId        String            @map("payee_id")
+  amountCents    Int               @map("amount_cents")
+  status         TransactionStatus @default(COMPLETED)
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  payer User @relation("PayerTransactions", fields: [payerId], references: [id])
+  payee User @relation("PayeeTransactions", fields: [payeeId], references: [id])
+
+  @@index([payerId])
+  @@index([payeeId])
+  @@map("transactions")
+}

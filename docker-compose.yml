@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: picpay-postgres
+    environment:
+      POSTGRES_USER: picpay
+      POSTGRES_PASSWORD: picpay_secret
+      POSTGRES_DB: picpay_db
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U picpay -d picpay_db']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: picpay-redis
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: picpay-api
+    ports:
+      - '3000:3000'
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://picpay:picpay_secret@postgres:5432/picpay_db?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AUTHORIZER_URL: https://util.devi.tools/api/v2/authorize
+      NOTIFIER_URL: https://util.devi.tools/api/v1/notify
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
